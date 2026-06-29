@@ -51,7 +51,6 @@ tab1, tab2, tab3 = st.tabs([
 # --- FUNCIÓN GENERADORA DEL REPORTE IMPRIMIBLE ---
 def generar_html_reporte(reg):
     estatus = "🟢 CLASE MUNDIAL" if reg['sigma'] >= 6 else ("🟡 ACEPTABLE" if reg['sigma'] >= 3 else "🔴 REVISAR")
-    
     html = f"""
     <html>
     <head>
@@ -92,106 +91,6 @@ def generar_html_reporte(reg):
                 <td class="meta-label">Sesgo Declarado:</td><td>{reg['sesgo']}%</td>
             </tr>
         </table>
-        
         <div class="cards">
             <div class="card"><div class="card-val">{reg['media']:.2f}</div><div class="card-lbl">Media Analítica</div></div>
-            <div class="card"><div class="card-val">{reg['cv']:.2f}%</div><div class="card-lbl">Imprecisión (CV%)</div></div>
-            <div class="card"><div class="card-val">{reg['sigma']:.2f} σ</div><div class="card-lbl">Métrica Sigma Real</div></div>
-            <div class="card" style="border-bottom-color: #22c55e;"><div class="card-val">{estatus}</div><div class="card-lbl">Dictamen Final</div></div>
-        </div>
-        
-        <h3>Valores Crudos del Protocolo</h3>
-        <table class="data-table">
-            <thead><tr><th>Punto / Réplica</th><th>Resultado Reportado ({reg['unidad']})</th></tr></thead>
-            <tbody>
-                {"".join([f"<tr><td>Punto {i+1}</td><td>{v}</td></tr>" for i, v in enumerate(reg['valores'])])}
-            </tbody>
-        </table>
-        
-        <div class="signature">Firma Supervisor de Calidad</div>
-    </body>
-    </html>
-    """
-    return html
-
-# --- TAB 1: VERIFICACIÓN N20 ---
-with tab1:
-    st.markdown("### 📊 Validación de Repetibilidad (N20)")
-    data_n20 = {"Réplica": [f"R{i}" for i in range(1, 21)], "Resultado": [0.0] * 20}
-    df_n20 = st.data_editor(pd.DataFrame(data_n20), key="editor_n20", hide_index=True, use_container_width=True)
-    
-    if st.button("Ejecutar Análisis N20", type="primary"):
-        valores = np.array(df_n20["Resultado"].tolist())
-        if sum(valores) == 0: st.error("Ingrese valores válidos.")
-        else:
-            media = np.mean(valores); sd = np.std(valores, ddof=1); cv = (sd/media)*100
-            sigma = (tea_clia - abs(sesgo_peec)) / cv
-            
-            nuevo_registro = {
-                "id": len(st.session_state['historial_laboratorio']) + 1,
-                "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "tipo": "Verificación N20", "analito": analito, "unidad": unidad,
-                "media": media, "sd": sd, "cv": cv, "sigma": sigma, "tea": tea_clia, "sesgo": sesgo_peec, "valores": valores.tolist()
-            }
-            st.session_state['historial_laboratorio'].append(nuevo_registro)
-            st.success("💾 ¡Análisis guardado en el historial!")
-
-# --- TAB 2: PRECISIÓN INTERMEDIA ---
-with tab2:
-    st.markdown("### 📅 Precisión Intermedia (Protocolo 5 Días)")
-    data_ip = {"Día": [f"D{i}" for i in range(1, 6)], "Resultado": [0.0] * 5}
-    df_ip = st.data_editor(pd.DataFrame(data_ip), key="editor_ip", hide_index=True, use_container_width=True)
-    
-    if st.button("Ejecutar Análisis Intermedio", type="primary"):
-        valores = np.array(df_ip["Resultado"].tolist())
-        if sum(valores) == 0: st.error("Ingrese valores válidos.")
-        else:
-            media = np.mean(valores); sd = np.std(valores, ddof=1); cv = (sd/media)*100
-            sigma = (tea_clia - abs(sesgo_peec)) / cv
-            
-            nuevo_registro = {
-                "id": len(st.session_state['historial_laboratorio']) + 1,
-                "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "tipo": "Precisión Intermedia (5D)", "analito": analito, "unidad": unidad,
-                "media": media, "sd": sd, "cv": cv, "sigma": sigma, "tea": tea_clia, "sesgo": sesgo_peec, "valores": valores.tolist()
-            }
-            st.session_state['historial_laboratorio'].append(nuevo_registro)
-            st.success("💾 ¡Análisis guardado en el historial!")
-
-# --- TAB 3: HISTORIAL DEL LABORATORIO ---
-with tab3:
-    st.markdown("### 🗄️ Registro Histórico Metrológico")
-    historial = st.session_state['historial_laboratorio']
-    
-    if len(historial) == 0:
-        st.info("El historial está vacío. Ejecute un estudio para revisarlo aquí.")
-    else:
-        resumen_datos = [{"ID": r["id"], "Fecha": r["fecha"], "Estudio": r["tipo"], "Analito": r["analito"], "Sigma": f"{r['sigma']:.2f} σ"} for r in historial]
-        st.dataframe(pd.DataFrame(resumen_datos), use_container_width=True, hide_index=True)
-        
-        st.markdown("---")
-        opciones_selector = [f"ID {r['id']} - {r['analito']} ({r['tipo']}) | {r['fecha']}" for r in historial]
-        seleccion = st.selectbox("Seleccione el registro para visualizar y exportar:", opciones_selector)
-        
-        id_sel = int(seleccion.split(" ")[1])
-        reg_activo = next(item for item in historial if item["id"] == id_sel)
-        
-        # --- BOTÓN INTERACTIVO DE EXPORTACIÓN EN PDF ---
-        html_reporte = generar_html_reporte(reg_activo)
-        st.download_button(
-            label="📥 Descargar Certificado de Auditoría PDF",
-            data=html_reporte,
-            file_name=f"Reporte_Calidad_{reg_activo['analito']}_{reg_activo['id']}.html",
-            mime="text/html",
-            help="Al descargar este archivo y abrirlo, se abrirá automáticamente el asistente de guardado PDF de tu computadora listo para imprimir."
-        )
-        
-        # Gráfica recuperada
-        fig, ax = plt.subplots(figsize=(10, 3.5))
-        fig.patch.set_facecolor('#F8FAFC')
-        v_viejos = reg_activo["valores"]
-        ax.plot(range(1, len(v_viejos)+1), v_viejos, marker='o', color='#0F2C59')
-        ax.axhline(reg_activo["media"], color='#22C55E', linewidth=2, label="Media")
-        ax.set_xticks(range(1, len(v_viejos)+1))
-        ax.legend()
-        st.pyplot(fig)
+            <div class="card"><div class="card-val">{reg['cv']:.2f}%</div><div class="
