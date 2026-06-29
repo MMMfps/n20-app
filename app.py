@@ -20,7 +20,7 @@ tea_clia = st.sidebar.number_input("ETa (%) sugerido (Glucosa = 8.0):", value=8.
 sesgo_peec = st.sidebar.number_input("Sesgo / Bias (%) reportado:", value=0.0, step=0.1)
 
 # --- NAVEGACIÓN POR PESTAÑAS ---
-tab1, tab2 = st.tabs(["⚡ Verificación N20 (Repetibilidad)", "📅 Precisión Intermedia (Dentro de Lab)"])
+tab1, tab2 = st.tabs(["⚡ Verificación N20 (Repetibilidad)", "📅 Precisión Intermedia (Protocolo 5 Días)"])
 
 # --- TAB 1: VERIFICACIÓN N20 ---
 with tab1:
@@ -43,23 +43,24 @@ with tab1:
             c1.metric("Media", f"{media:.2f}")
             c2.metric("CV%", f"{cv:.2f}%")
             c3.metric("Sigma Real", f"{sigma:.2f} σ")
-            c4.metric("Estatus", "Pasa" if cv <= (tea_clia/3) else "Revisar") # Regla de oro: CV < 1/3 ETa
+            c4.metric("Estatus", "Pasa" if cv <= (tea_clia/3) else "Revisar")
             
             # Gráfico
-            fig, ax = plt.subplots(figsize=(10,4))
-            ax.plot(range(1,21), valores, 'ko-')
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(range(1, 21), valores, 'ko-')
             ax.axhline(media, color='g', label='Media')
             ax.axhline(media + 2*sd, color='b', ls='--'); ax.axhline(media - 2*sd, color='b', ls='--')
             ax.axhline(media + 3*sd, color='r', ls='-'); ax.axhline(media - 3*sd, color='r', ls='-')
             ax.set_title(f"Levey-Jennings: Repetibilidad {analito}"); ax.legend()
             st.pyplot(fig)
 
-# --- TAB 2: PRECISIÓN INTERMEDIA ---
+# --- TAB 2: PRECISIÓN INTERMEDIA (5 DÍAS) ---
 with tab2:
     st.subheader(f"Precisión Intermedia (Día a Día) - {analito}")
-    st.write("Ingrese los resultados de control de calidad de los últimos 20 días.")
+    st.write("Ingrese los resultados de control de calidad de **5 días** consecutivos.")
     
-    data_ip = {"Día": [f"D{i}" for i in range(1, 21)], "Resultado": [0.0] * 20}
+    # Modificado aquí: Ahora solo genera 5 filas (D1 a D5)
+    data_ip = {"Día": [f"D{i}" for i in range(1, 6)], "Resultado": [0.0] * 5}
     df_ip = st.data_editor(pd.DataFrame(data_ip), key="editor_ip", hide_index=True, use_container_width=True)
     
     if st.button("📈 Analizar Precisión Intermedia", type="primary"):
@@ -73,17 +74,21 @@ with tab2:
             # Métricas Sigma
             st.subheader("Informe de Desempeño Sigma")
             col_s1, col_s2 = st.columns([1, 2])
-            col_s1.metric("Sigma Intermedio", f"{sigma:.2f} σ")
+            col_s1.metric("Sigma Intermedio (5D)", f"{sigma:.2f} σ")
             if sigma >= 6: col_s2.success("Calidad de Clase Mundial (6 Sigma)")
             elif sigma >= 3: col_s2.warning("Calidad Marginal (Requiere control estricto)")
             else: col_s2.error("Calidad No Aceptable (Fuera de control)")
 
-            # Gráfico de Levey-Jennings
-            fig, ax = plt.subplots(figsize=(10,4))
-            ax.plot(range(1,21), valores, 'bo-', label="Control Diario")
+            # Gráfico de Levey-Jennings de 5 puntos
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(range(1, 6), valores, 'bo-', label="Control Diario")
             ax.axhline(media, color='green', label='Media')
             ax.axhline(media + 2*sd, color='orange', ls='--', label='±2 SD')
+            ax.axhline(media - 2*sd, color='orange', ls='--')
             ax.axhline(media + 3*sd, color='red', ls='-', label='±3 SD')
-            ax.set_title(f"Levey-Jennings: Precisión Intermedia {analito}")
-            ax.set_ylabel(unidad); ax.set_xlabel("Día"); ax.legend(bbox_to_anchor=(1,1))
+            ax.axhline(media - 3*sd, color='red', ls='-')
+            ax.set_title(f"Levey-Jennings: Precisión Intermedia (5 Días) - {analito}")
+            ax.set_ylabel(unidad); ax.set_xlabel("Día")
+            ax.set_xticks(range(1, 6)) # Forzar a que muestre exactamente los días 1 al 5 en el eje X
+            ax.legend(bbox_to_anchor=(1, 1))
             st.pyplot(fig)
