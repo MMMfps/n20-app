@@ -48,9 +48,15 @@ tab1, tab2, tab3 = st.tabs([
     "🗄️ Historial del Laboratorio"
 ])
 
-# --- FUNCIÓN GENERADORA DEL REPORTE IMPRIMIBLE ---
+# --- FUNCIÓN GENERADORA DEL REPORTE IMPRIMIBLE (CORREGIDA) ---
 def generar_html_reporte(reg):
     estatus = "🟢 CLASE MUNDIAL" if reg['sigma'] >= 6 else ("🟡 ACEPTABLE" if reg['sigma'] >= 3 else "🔴 REVISAR")
+    
+    # Construimos las filas de la tabla fuera del f-string para evitar el SyntaxError
+    filas_tabla = ""
+    for i, v in enumerate(reg['valores']):
+        filas_tabla += f"<tr><td>Punto {i+1}</td><td>{v}</td></tr>"
+        
     html = f"""
     <html>
     <head>
@@ -93,4 +99,42 @@ def generar_html_reporte(reg):
         </table>
         <div class="cards">
             <div class="card"><div class="card-val">{reg['media']:.2f}</div><div class="card-lbl">Media Analítica</div></div>
-            <div class="card"><div class="card-val">{reg['cv']:.2f}%</div><div class="
+            <div class="card"><div class="card-val">{reg['cv']:.2f}%</div><div class="card-lbl">Imprecisión (CV%)</div></div>
+            <div class="card"><div class="card-val">{reg['sigma']:.2f} σ</div><div class="card-lbl">Métrica Sigma Real</div></div>
+            <div class="card" style="border-bottom-color: #22c55e;"><div class="card-val">{estatus}</div><div class="card-lbl">Dictamen Final</div></div>
+        </div>
+        <h3>Valores Crudos del Protocolo</h3>
+        <table class="data-table">
+            <thead><tr><th>Punto / Réplica</th><th>Resultado Reportado ({reg['unidad']})</th></tr></thead>
+            <tbody>
+                {filas_tabla}
+            </tbody>
+        </table>
+        <div class="signature">Firma Supervisor de Calidad</div>
+    </body>
+    </html>
+    """
+    return html
+
+# --- TAB 1: VERIFICACIÓN N20 ---
+with tab1:
+    st.markdown("### 📊 Validación de Repetibilidad (N20)")
+    st.caption("Ingrese las 20 réplicas analizadas en la misma serie de trabajo.")
+    
+    data_n20 = {"Réplica": [f"R{i}" for i in range(1, 21)], "Resultado": [0.0] * 20}
+    df_n20 = st.data_editor(pd.DataFrame(data_n20), key="editor_n20", hide_index=True, use_container_width=True)
+    
+    if st.button("Ejecutar Análisis N20", type="primary"):
+        valores = np.array(df_n20["Resultado"].tolist())
+        if sum(valores) == 0: 
+            st.error("Por favor, ingrese valores válidos en la tabla.")
+        else:
+            media = np.mean(valores); sd = np.std(valores, ddof=1); cv = (sd/media)*100
+            sigma = (tea_clia - abs(sesgo_peec)) / cv
+            
+            # 1. Respaldo en historial
+            nuevo_registro = {
+                "id": len(st.session_state['historial_laboratorio']) + 1,
+                "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "tipo": "Verificación N20", "analito": analito, "unidad": unidad,
+                "media": media
