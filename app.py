@@ -137,4 +137,126 @@ with tab1:
                 "id": len(st.session_state['historial_laboratorio']) + 1,
                 "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "tipo": "Verificación N20", "analito": analito, "unidad": unidad,
-                "media": media
+                "media": media, "sd": sd, "cv": cv, "sigma": sigma, "tea": tea_clia, "sesgo": sesgo_peec, "valores": valores.tolist()
+            }
+            st.session_state['historial_laboratorio'].append(nuevo_registro)
+            st.success("💾 ¡Análisis procesado y guardado en el Historial con éxito!")
+
+            # 2. Despliegue inmediato
+            st.markdown("#### 📋 Resultados Estadísticos Obtenidos")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Media Calculada", f"{media:.2f} {unidad}")
+            c2.metric("Imprecisión (CV%)", f"{cv:.2f}%")
+            c3.metric("Métrica Sigma Real", f"{sigma:.2f} σ")
+            
+            if cv <= (tea_clia/3): c4.success("✅ PASA (CV < 1/3 ETa)")
+            else: c4.error("🚨 REVISAR (CV Alto)")
+            
+            # 3. Gráfico inmediato
+            st.markdown("#### 📈 Gráfico de Control Levey-Jennings (Inmediato)")
+            fig, ax = plt.subplots(figsize=(10, 4))
+            fig.patch.set_facecolor('#F8FAFC')
+            ax.set_facecolor('#FFFFFF')
+            
+            ax.plot(range(1, 21), valores, marker='o', linestyle='-', color='#0F2C59', linewidth=2, label='Valores N20')
+            ax.axhline(media, color='#22C55E', linewidth=2, label=f'Media ({media:.2f})')
+            ax.axhline(media + 2*sd, color='#3B82F6', ls='--', alpha=0.7, label='±2 SD')
+            ax.axhline(media - 2*sd, color='#3B82F6', ls='--')
+            ax.axhline(media + 3*sd, color='#EF4444', ls='-', alpha=0.7, label='±3 SD')
+            ax.axhline(media - 3*sd, color='#EF4444', ls='-')
+            
+            ax.set_xticks(range(1, 21))
+            ax.grid(True, color='#E2E8F0', linestyle=':', alpha=0.6)
+            ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+            st.pyplot(fig)
+
+# --- TAB 2: PRECISIÓN INTERMEDIA ---
+with tab2:
+    st.markdown("### 📅 Precisión Intermedia (Protocolo 5 Días)")
+    st.caption("Ingrese los resultados del control de calidad de 5 días consecutivos.")
+    
+    data_ip = {"Día": [f"D{i}" for i in range(1, 6)], "Resultado": [0.0] * 5}
+    df_ip = st.data_editor(pd.DataFrame(data_ip), key="editor_ip", hide_index=True, use_container_width=True)
+    
+    if st.button("Ejecutar Análisis Intermedio", type="primary"):
+        valores = np.array(df_ip["Resultado"].tolist())
+        if sum(valores) == 0: 
+            st.error("Por favor, ingrese valores válidos en la tabla.")
+        else:
+            media = np.mean(valores); sd = np.std(valores, ddof=1); cv = (sd/media)*100
+            sigma = (tea_clia - abs(sesgo_peec)) / cv
+            
+            # 1. Respaldo en historial
+            nuevo_registro = {
+                "id": len(st.session_state['historial_laboratorio']) + 1,
+                "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "tipo": "Precisión Intermedia (5D)", "analito": analito, "unidad": unidad,
+                "media": media, "sd": sd, "cv": cv, "sigma": sigma, "tea": tea_clia, "sesgo": sesgo_peec, "valores": valores.tolist()
+            }
+            st.session_state['historial_laboratorio'].append(nuevo_registro)
+            st.success("💾 ¡Análisis procesado y guardado en el Historial con éxito!")
+
+            # 2. Despliegue inmediato
+            st.markdown("#### 🎯 Evaluación del Desempeño Six Sigma")
+            col_s1, col_s2 = st.columns([1, 3])
+            col_s1.metric("Sigma Intermedio", f"{sigma:.2f} σ")
+            
+            if sigma >= 6: col_s2.success("🟢 **CALIDAD DE CLASE MUNDIAL (6 Sigma):** El proceso es extremadamente robusto.")
+            elif sigma >= 3: col_s2.warning("🟡 **CALIDAD MARGINAL / ACEPTABLE:** Requiere vigilancia continua mediante Westgard.")
+            else: col_s2.error("🔴 **CALIDAD NO ACEPTABLE:** Se requiere acción correctiva inmediata.")
+
+            # 3. Gráfico inmediato
+            st.markdown("#### 📈 Historial de Control Diario (5D)")
+            fig, ax = plt.subplots(figsize=(10, 4))
+            fig.patch.set_facecolor('#F8FAFC')
+            ax.set_facecolor('#FFFFFF')
+            
+            ax.plot(range(1, 6), valores, marker='s', linestyle='-', color='#10B981', linewidth=2, label='Control Diario')
+            ax.axhline(media, color='#22C55E', linewidth=2, label='Media')
+            ax.axhline(media + 2*sd, color='#3B82F6', ls='--', label='±2 SD')
+            ax.axhline(media - 2*sd, color='#3B82F6', ls='--')
+            ax.axhline(media + 3*sd, color='#EF4444', ls='-', label='±3 SD')
+            ax.axhline(media - 3*sd, color='#EF4444', ls='-')
+            
+            ax.set_ylabel(unidad)
+            ax.set_xlabel("Día de Evaluación")
+            ax.set_xticks(range(1, 6))
+            ax.grid(True, color='#E2E8F0', linestyle=':', alpha=0.6)
+            ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+            st.pyplot(fig)
+
+# --- TAB 3: HISTORIAL DEL LABORATORIO ---
+with tab3:
+    st.markdown("### 🗄️ Registro Histórico Metrológico")
+    st.caption("Consulte y audite todos los análisis guardados previamente en Verona Quality Lab.")
+    historial = st.session_state['historial_laboratorio']
+    
+    if len(historial) == 0:
+        st.info("El historial está vacío. Ejecute un estudio en las pestañas anteriores para revisarlo aquí.")
+    else:
+        resumen_datos = [{"ID": r["id"], "Fecha": r["fecha"], "Estudio": r["tipo"], "Analito": r["analito"], "Sigma": f"{r['sigma']:.2f} σ"} for r in historial]
+        st.dataframe(pd.DataFrame(resumen_datos), use_container_width=True, hide_index=True)
+        
+        st.markdown("---")
+        opciones_selector = [f"ID {r['id']} - {r['analito']} ({r['tipo']}) | {r['fecha']}" for r in historial]
+        seleccion = st.selectbox("Seleccione el registro para visualizar y exportar:", opciones_selector)
+        
+        id_sel = int(seleccion.split(" ")[1])
+        reg_activo = next(item for item in historial if item["id"] == id_sel)
+        
+        html_reporte = generar_html_reporte(reg_activo)
+        st.download_button(
+            label="📥 Descargar Certificado de Auditoría PDF",
+            data=html_reporte,
+            file_name=f"Reporte_Calidad_{reg_activo['analito']}_{reg_activo['id']}.html",
+            mime="text/html"
+        )
+        
+        # Gráfica recuperada
+        fig, ax = plt.subplots(figsize=(10, 3.5))
+        fig.patch.set_facecolor('#F8FAFC')
+        v_viejos = reg_activo["valores"]
+        ax.plot(range(1, len(v_viejos)+1), v_viejos, marker='o', color='#0F2C59')
+        ax.axhline(reg_activo["media"], color='#22C55E', linewidth=2)
+        ax.set_xticks(range(1, len(v_viejos)+1))
+        st.pyplot(fig)
