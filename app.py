@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Configuracion profesional de la pagina
 st.set_page_config(
@@ -26,7 +27,7 @@ st.markdown("---")
 st.subheader(f"🔢 Ingrese los 20 resultados para: {analito} ({unidad})")
 st.info("Modifique los valores de la tabla a continuacion con sus datos reales:")
 
-# Creamos una estructura de datos vacia (20 filas) para que el usuario llene como Excel
+# Creamos una estructura de datos vacia (20 filas) para que el usuario llne como Excel
 datos_iniciales = {"Replica": [f"R{i}" for i in range(1, 21)], "Resultado": [0.0] * 20}
 df_input = pd.DataFrame(datos_iniciales)
 
@@ -65,3 +66,38 @@ if st.button("📊 Ejecutar Analisis Estadistico", type="primary"):
             st.success(f"✅ **APROBADO**: El CV% obtenido ({cv:.2f}%) es MENOR o igual al limite permitido ({tea_permitido:.2f}%). El metodo demuestra una imprecision aceptable.")
         else:
             st.error(f"🚨 **RECHAZADO**: El CV% obtenido ({cv:.2f}%) SUPERÓ el limite establecido ({tea_permitido:.2f}%). Se sugiere revisar la calibracion, el lote de reactivo o el estado del sistema optico/pipeteo.")
+        
+        st.markdown("---")
+        
+        # Generacion de la Grafica de Levey-Jennings al final
+        st.subheader("📈 Grafico de Levey-Jennings (N20)")
+        
+        # Crear la figura de Matplotlib
+        fig, ax = plt.subplots(figsize=(10, 5))
+        
+        # Graficar los puntos introducidos por el usuario
+        replicas_numeros = list(range(1, 21))
+        ax.plot(replicas_numeros, datos, marker="o", linestyle="-", color="black", label="Valores N20")
+        
+        # Dibujar lineas horizontales de control basadas en los datos calculados
+        ax.axhline(media, color="green", linestyle="-", label=f"Media ({media:.2f})")
+        
+        ax.axhline(media + sd, color="orange", linestyle="--", alpha=0.5)
+        ax.axhline(media - sd, color="orange", linestyle="--", alpha=0.5)
+        
+        ax.axhline(media + 2*sd, color="blue", linestyle="--", label=f"+2 SD ({(media + 2*sd):.2f})")
+        ax.axhline(media - 2*sd, color="blue", linestyle="--", label=f"-2 SD ({(media - 2*sd):.2f})")
+        
+        ax.axhline(media + 3*sd, color="red", linestyle="-", label=f"+3 SD ({(media + 3*sd):.2f})")
+        ax.axhline(media - 3*sd, color="red", linestyle="-", label=f"-3 SD ({(media - 3*sd):.2f})")
+        
+        # Ajustes esteticos del grafico
+        ax.set_title(f"Grafico de Control para {analito} ({unidad})")
+        ax.set_xlabel("Numero de Replica")
+        ax.set_ylabel(f"Concentracion ({unidad})")
+        ax.set_xticks(replicas_numeros)
+        ax.grid(axis="x", alpha=0.3)
+        ax.legend(loc="upper left", bbox_to_anchor=(1, 1)) # Pone la leyenda afuera para que no tape los puntos
+        
+        # Renderizar el grafico de Matplotlib en la interfaz de Streamlit
+        st.pyplot(fig)
